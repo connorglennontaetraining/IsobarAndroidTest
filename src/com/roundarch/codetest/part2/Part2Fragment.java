@@ -2,47 +2,69 @@ package com.roundarch.codetest.part2;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Parcel;
+import android.os.Parcelable;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
 import com.roundarch.codetest.R;
 
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import butterknife.Unbinder;
+
+import static android.app.Activity.RESULT_OK;
+
 public class Part2Fragment extends Fragment {
-    private static String EXTRA_MODEL = "extra_model";
+    public static String EXTRA_MODEL = "extra_model";
     private DataModel mModel = new DataModel();
 
-    private TextView textView1;
-    private TextView textView3;
-    private TextView textView2;
+    @BindView(R.id.button1)
+    Button button1;
+    @BindView(R.id.textView1)
+    TextView textView1;
+    @BindView(R.id.textView2)
+    TextView textView2;
+    @BindView(R.id.textView3)
+    TextView textView3;
+
+    Unbinder mButterKnifeUnbinder;
 
     @Override
     public View
             onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_part2, null);
+        return inflater.inflate(R.layout.fragment_part2, null);
+    }
 
-        // TODO -
-        view.findViewById(R.id.button1).setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                onClick_edit();
-            }
-        });
-
-        textView1 = (TextView)view.findViewById(R.id.textView1);
-        textView2 = (TextView)view.findViewById(R.id.textView2);
-        textView3 = (TextView)view.findViewById(R.id.textView3);
-
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         if (savedInstanceState != null) {
             if (savedInstanceState.containsKey(EXTRA_MODEL)) {
                 mModel = (DataModel) savedInstanceState.get(EXTRA_MODEL);
             }
         }
-
+        mButterKnifeUnbinder = ButterKnife.bind(this, view);
+        button1.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onClick_edit();
+            }
+        });
         setTextViews();
-        return view;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        mButterKnifeUnbinder.unbind();
     }
 
     @Override
@@ -53,18 +75,27 @@ public class Part2Fragment extends Fragment {
     }
 
     public void onClick_edit() {
-        // TODO - package up the data model and provide it to the new EditActivity as it is being created
         Intent intent = new Intent(this.getActivity(), EditActivity.class);
-
-        // TODO - this probably isn't the best way to start the EditActivty, try to fix it
-        startActivity(intent);
+        intent.putExtra(EXTRA_MODEL, (Parcelable) mModel);
+        startActivityForResult(intent, 1);
     }
 
-    // TODO - provide a method to obtain the data model when it is returned from the EditActivity
+    private void getModelFromIntent(Intent data){
+        mModel = data.getParcelableExtra(EXTRA_MODEL);
+        setTextViews();
+    }
 
     private void setTextViews() {
         textView1.setText(mModel.getText1());
         textView2.setText(mModel.getText2());
         textView3.setText(String.valueOf(mModel.getText3()));
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if(requestCode == 1){
+            getModelFromIntent(data);
+        }
     }
 }

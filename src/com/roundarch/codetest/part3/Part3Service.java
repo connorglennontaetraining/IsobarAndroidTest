@@ -2,17 +2,35 @@ package com.roundarch.codetest.part3;
 
 import android.app.Service;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.IBinder;
 
+import com.google.gson.Gson;
+import com.jakewharton.retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import io.reactivex.Observable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.functions.Consumer;
+import io.reactivex.schedulers.Schedulers;
+import okhttp3.Interceptor;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+import retrofit2.http.GET;
 
 public class Part3Service extends Service {
 
     private final String TAG = this.getClass().getSimpleName();
 
-    // TODO - we can use this as the broadcast intent to filter for in our Part3Fragment
     public static final String ACTION_SERVICE_DATA_UPDATED = "com.roundarch.codetest.ACTION_SERVICE_DATA_UPDATED";
 
     private List<Map<String,String>> data = null;
@@ -24,33 +42,72 @@ public class Part3Service extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        // TODO - this interface needs to be implemented to allow consumers
-        // TODO - access to the data we plan to download
         return new Part3ServiceBinder();
     }
 
-    private void updateData() {
-        // TODO - start the update process for our data
+    public void refreshData() {
+        AsyncTask asyncTask = new AsyncTask() {
+            @Override
+            protected Object doInBackground(Object[] objects) {
+                data = new ArrayList<>();
+                List<Result> resultList = requestData();
+                for(Result result: resultList) {
+                    Map<String, String> resultValues = new HashMap<>();
+                    resultValues.put("zipcode", result.getZipcode());
+                    resultValues.put("zipclass", result.getZipClass());
+                    data.add(resultValues);
+                }
+                return null;
+            }
+
+            @Override
+            protected void onPostExecute(Object o) {
+                super.onPostExecute(o);
+                broadcastDataUpdated();
+            }
+        }.execute();
     }
 
     private void broadcastDataUpdated() {
-        // TODO - send the broadcast
+        Intent intent = new Intent();
+        intent.setAction(ACTION_SERVICE_DATA_UPDATED);
+        intent.putParcelableArrayListExtra("results", (ArrayList)data);
+        sendBroadcast(intent);
     }
 
     public final class Part3ServiceBinder extends Binder {
-        // TODO - we need to expose our public IBinder API to clients
+        public Part3Service getService(){
+            return Part3Service.this;
+        }
     }
 
-    // TODO - eventually we plan to request JSON from the network, so we need
-    // TODO - to implement a way to perform that off the main thread.  Then, once we
-    // TODO - have the data we can parse it as JSON (using standard Android APIs is fine)
-    // TODO - before finally returning to the main thread to store our data on the service.
-    // TODO - Keep in mind that the service will keep a local copy and will need an interface
-    // TODO - to allow clients to access it.
+    private List<Result> requestData(){
+        OkHttpClient okHttpClient = new OkHttpClient();
+        Request request;
+        Response response;
+        Results results;
 
-    // TODO - if you need a simple JSON endpoint, you can obtain the ZIP codes for the state
-    // TODO - of Illinois by using this URL:
-    //
-    // TODO - http://gomashup.com/json.php?fds=geo/usa/zipcode/state/IL
+        try {
+            request = new Request.Builder()
+                    .url("http://gomashup.com/json.php?fds=geo/usa/zipcode/state/IL")
+                    .header("Accept", "application/json")
+                    .get()
+                    .build();
+            response = okHttpClient.newCall(request).execute();
+            String body = response.body().string().replace("(", "").replace(")", "");
+            results = new Gson().fromJson(body, Results.class);
+            return results.getResult();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    interface IRequest{
+        @GET("json.php?fds=geo/usa/zipcode/state/IL")
+        Observable<Results> getResults();
+    }
 
 }
